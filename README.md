@@ -15,4 +15,22 @@ Module 1: Introduction to TCL and VSDSYNTH Toolbox usage
 2. VSDSYNTH Toolbox scenarios and help flow
 3. Handling user input and CSV formats
 
+This is the .CSV file
 <img width="743" height="685" alt="image" src="https://github.com/user-attachments/assets/02f71b79-da5b-429d-8cfb-9ad72e8c7bc1" />
+
++ Sub-Task One : VSDSYNTH Toolbox usage scenarios
+Scenario 1 : User doesn't provide an input csv file.
+
+-> Create command (ex: vsdsynth) and pass .csv from UNIX shell to TCL script
+General scenarios : From user point of view.
+1. Not provide .csv file as input
+   <img width="928" height="60" alt="image" src="https://github.com/user-attachments/assets/f29b2767-ad15-4d06-9bfb-908c8ca43ce6" />
+2. Provide a .csv file which doesn't exist
+   <img width="922" height="57" alt="image" src="https://github.com/user-attachments/assets/bea89be3-ea51-4259-931d-1859703a9fca" />
+3. Type "-help" to find out usage
+   <img width="922" height="65" alt="image" src="https://github.com/user-attachments/assets/6f9a9cb3-1108-40db-8a1b-9d319a7001c1" />
+
+   
+
+
+
