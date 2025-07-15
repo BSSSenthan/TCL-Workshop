@@ -16,6 +16,7 @@ Module 1: Introduction to TCL and VSDSYNTH Toolbox usage
 3. Handling user input and CSV formats
 
 This is the .CSV file
+
 <img width="743" height="685" alt="image" src="https://github.com/user-attachments/assets/02f71b79-da5b-429d-8cfb-9ad72e8c7bc1" />
 
 + Sub-Task One : VSDSYNTH Toolbox usage scenarios
