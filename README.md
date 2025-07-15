@@ -32,36 +32,8 @@ General scenarios : From user point of view.
    <img width="922" height="65" alt="image" src="https://github.com/user-attachments/assets/6f9a9cb3-1108-40db-8a1b-9d319a7001c1" />
 
 
-if ($#argv != 1) then
-	echo "Info: Please provide the csv file"
-	exit 1
-endif
+<img width="1056" height="575" alt="image" src="https://github.com/user-attachments/assets/0207435c-fe20-4a39-9336-b307a18c3155" />
 
-if (! -f $argv[1] || $argv[1] == "-help") then
-	if ($argv[1] != "-help") then
-		echo "Error: Cannot find csv file $argv[1]. Exiting..."
-		exit 1
-	else
-		echo USAGE: ./vsdsynth \<csv file\>
-		echo
-		echo        where \csv file\> consists of 2 columns, below keyword being in 1st column and is Case Sensitive. PLease request PS for sample csv file
-		echo
-		echo        \<Design Name\> is the name of the top level module
-                echo
-                echo        \<Output Directory\> is the name of the output directory where you want to dump synthesis script, synthesized netlist and timing reports
-                echo
-                echo        \<Netlist Directory\> is the name of  directory where all the RTL netlist are present
-                echo
-                echo        \<Early Library Path\> is the file path of the early cell library to be used for STA
-                echo
-                echo        \<Late Library Path\> is the file path of the late cell library to be used for STA
-                echo
-                echo        \<Constraints file\> is csv file path of contraints to be used for STA
-		echo
-		exit 1
-	endif
-else tclsh ./vsdsynth.tcl $argv[1]
-endif
 
 <img width="1596" height="672" alt="image" src="https://github.com/user-attachments/assets/f3eb90af-c3de-423e-a9da-1f0927cee6f7" />
 
