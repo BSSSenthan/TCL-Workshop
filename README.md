@@ -40,3 +40,37 @@ The output of the above code :
 
 <img width="1596" height="672" alt="image" src="https://github.com/user-attachments/assets/f3eb90af-c3de-423e-a9da-1f0927cee6f7" />
 
+Module 2: Variable Creation & Constraint Processing
+
+In this module we will be converting all the inputs to format [1] & SDC format, and pass to synthesis tool 'Yosys'
+
+-> Tasks involved to achieve this
+1. Create variables
+2. Check if directories and files mentioned in .csv exist or not
+3. Read "Constraints File" for above .csv and convert to SDC format
+4. Read all files in "Netlist Directory"
+5. Create main synthesis script in format[2]
+6. Pass this script to Yosys
+
+Working with arrays, matrices, and loop constructs
+Parsing and validating CSV/SDC constraint files Inside the openMSP430_design_constraints.csv file
+
+<img width="1918" height="1017" alt="image" src="https://github.com/user-attachments/assets/adbf4dd7-0ad7-4003-a604-c0c6fddaf41c" />
+
+
+vsdsynth.tcl (using the matric package and creating a matrix from the details.csv file.
+
+<pre> ```tclset filename [lindex $argv 0]
+package require csv
+package require struct::matrix
+struct::matrix m
+set f [open $filename]
+csv::read2matrix $f m , auto
+close $f
+set columns [m columns]
+#m add columns $columns
+m link my_arr
+set num_of_rows [m rows] ``` </pre>
+
+
+
