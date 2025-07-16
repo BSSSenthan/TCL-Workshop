@@ -72,7 +72,7 @@ set columns [m columns]
 m link my_arr
 set num_of_rows [m rows] ``` </pre>
 
-Variables were automatically created by converting the .csv file into a matrix, determining the number of rows and columns, and dynamically generating variables for each entry using the matrix structure (my_arr).
+By converting the .csv file into a matrix, the number of rows and columns was determined, and variables for each entry were dynamically created using the my_arr structure.
 
 <pre> ```set i 0
 	while {$i < $num_of_rows} {
@@ -94,5 +94,71 @@ puts "EarlyLibraryPath = $EarlyLibraryPath"
 puts "LateLibraryPath = $LateLibraryPath"
 puts "ConstraintsFile = $ConstraintsFile"``` </pre>
 
+<img width="1292" height="773" alt="image" src="https://github.com/user-attachments/assets/e0a05458-bcff-48ef-97f1-831bf816dfe6" />
+
+The names got converted into variables by removing spaces and paths got assigned to these variables.
+
+<img width="772" height="560" alt="image" src="https://github.com/user-attachments/assets/18af75de-a415-43af-a0a8-af621d464365" />
+
+This script verifies the existence of all required files and directories. If file or directory missing, the script throws an error message to prevent further execution. The only exception is the output directory, which is automatically created if it does not already exist.
+
+<pre> ```if {![file isdirectory $OutputDirectory]} {
+	puts "\nInfo: Cannot find output directory $OutputDirectory. Creating $OutputDirectory"
+	file mkdir $OutputDirectory
+} else {
+	puts "\nInfo: Output directory found in path $OutputDirectory"
+}
+if {![file isdirectory $NetlistDirectory]} {
+        puts "\nInfo: Cannot find RTL netlist directory $NetlistDirectory. Exiting..."
+        exit
+} else {
+        puts "\nInfo: RTL Netlist directory found in path $NetlistDirectory"
+}
+if {![file exists $EarlyLibraryPath]} {
+        puts "\nInfo: Cannot find early cell library in path $EarlyLibraryPath. Exiting..."
+        exit
+} else {
+        puts "\nInfo: Early cell library found in path $EarlyLibraryPath"
+}
+if {![file exists $LateLibraryPath]} {
+        puts "\nInfo: Cannot find late cell library in path $LateLibraryPath. Exiting..."
+        exit
+} else {
+        puts "\nInfo: Late cell library found in path $LateLibraryPath"
+}
+if {![file exists $ConstraintsFile]} {
+        puts "\nInfo: Cannot find constraints file in path $ConstraintsFile. Exiting..."
+        exit
+} else {
+        puts "\nInfo: Contraints file found in path $ConstraintsFile"
+}``` </pre>
+
+
+
+<img width="591" height="412" alt="image" src="https://github.com/user-attachments/assets/22e5e33c-98c2-4879-aa3c-78232aa2c736" />
+
+The file was successfully read and converted into a matrix structure. The script identified the total number of rows and columns, and determined the starting indices for clock, input, and output constraints. Below is the core TCL code used for processing
+
+<pre> ```puts "\nInfo: Dumping SDC contraints file for $DesignName"
+::struct::matrix constraints
+set  chan [open $ConstraintsFile]
+csv::read2matrix $chan constraints  , auto
+close $chan
+set number_of_rows [constraints rows]
+puts "number_of_rows are $number_of_rows"
+set number_of_columns [constraints columns]
+puts "number_of_columns are $number_of_columns"
+set clock_start [lindex [lindex [constraints search all CLOCKS] 0 ] 1]
+puts "clock_start = $clock_start"
+set clock_start_column [lindex [lindex [constraints search all CLOCKS] 0 ] 0]
+puts "clock_start_column = $clock_start_column"
+#----check row number for "inputs" section in constraints.csv------------#
+set input_ports_start [lindex [lindex [constraints search all INPUTS] 0 ] 1]
+puts "input_ports_start = $input_ports_start"
+#----check row number for "inputs" section in constraints.csv------------#
+set output_ports_start [lindex [lindex [constraints search all OUTPUTS] 0 ] 1]
+puts "output_ports_start = $output_ports_start"``` </pre>
+
+<img width="556" height="505" alt="image" src="https://github.com/user-attachments/assets/199a0e99-5dcf-4ce2-b28d-d8bdb88cae5f" />
 
 
