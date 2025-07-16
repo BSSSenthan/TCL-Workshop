@@ -60,7 +60,7 @@ Parsing and validating CSV/SDC constraint files Inside the openMSP430_design_con
 
 vsdsynth.tcl (using the matric package and creating a matrix from the details.csv file.
 
-</pre>```tclset filename [lindex $argv 0]
+<pre> ```set filename [lindex $argv 0]
 package require csv
 package require struct::matrix
 struct::matrix m
