@@ -72,5 +72,27 @@ set columns [m columns]
 m link my_arr
 set num_of_rows [m rows] ``` </pre>
 
+Variables were automatically created by converting the .csv file into a matrix, determining the number of rows and columns, and dynamically generating variables for each entry using the matrix structure (my_arr).
+
+<pre> ```set i 0
+	while {$i < $num_of_rows} {
+		puts "\nInfo: Setting $my_arr(0,$i) as '$my_arr(1,$i)'"
+		if {$i == 0} {
+			set [string map {" " ""} $my_arr(0,$i)] $my_arr(1,$i)
+		} else {
+			set [string map {" " ""} $my_arr(0,$i)] [file normalize $my_arr(1,$i)]
+		}
+		set i [expr {$i+1}]
+	}
+}
+
+puts "\nInfo: Below are the list of initial variables and their values. User can use these variables for further debug. Use 'puts <variable name>' command to query value of below variables"
+puts "DesignName = $DesignName"
+puts "OutputDirectory = $OutputDirectory"
+puts "NetlistDirectory = $NetlistDirectory"
+puts "EarlyLibraryPath = $EarlyLibraryPath"
+puts "LateLibraryPath = $LateLibraryPath"
+puts "ConstraintsFile = $ConstraintsFile"``` </pre>
+
 
 
