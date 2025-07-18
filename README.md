@@ -300,13 +300,204 @@ close $tmp2_file``` </pre>
 
 
 
+Module 4: RTL Synthesis & Yosys Integration
+
+In this module processing the output section of the constraints .csv file and generating the corresponding SDC commands, performing a sample synthesis using Yosys with an example memory block, checking the hierarchy in Yosys, and implementing error handling for hierarchy-related issues. This involves giving the .csv file to extract output-related constraints, differentiating between bit-level and bus-type outputs, and generating the SDC commands in the .sdc file. A Yosys script is developed to perform the hierarchy check, and error-handling code is also implemented to identify and manage hierarchy-related issues during synthesis. 
 
 
+<pre> ```set output_early_rise_delay_start [lindex [lindex [constraints search rect $clock_start_column $output_ports_start [expr {$number_of_columns-1}] [expr {$number_of_rows-1}] early_rise_delay] 0] 0]
+set output_early_fall_delay_start [lindex [lindex [constraints search rect $clock_start_column $output_ports_start [expr {$number_of_columns-1}] [expr {$number_of_rows-1}] early_fall_delay] 0] 0]
+set output_late_rise_delay_start [lindex [lindex [constraints search rect $clock_start_column $output_ports_start [expr {$number_of_columns-1}] [expr {$number_of_rows-1}] late_rise_delay] 0] 0]
+set output_late_fall_delay_start [lindex [lindex [constraints search rect $clock_start_column $output_ports_start [expr {$number_of_columns-1}] [expr {$number_of_rows-1}] late_fall_delay] 0] 0]
+set output_load_start [lindex [lindex [constraints search rect $clock_start_column $output_ports_start [expr {$number_of_columns-1}] [expr {$number_of_rows-1}] load] 0 ] 0]
+
+set related_clock [lindex [lindex [constraints search rect $clock_start_column $output_ports_start [expr {$number_of_columns-1}] [expr {$number_of_rows-1}] clocks] 0 ] 0]
+set i [expr {$output_ports_start+1}]
+set end_of_ports [expr {$number_of_rows-1}]
+puts "\nInfo-SDC: Working on IO constraints......."
+puts "\nInfo-SDC: Categorizing output ports as bits and bussed"
+
+while {$i < $end_of_ports} {
+set netlist [glob -dir $NetlistDirectory *.v]
+set tmp_file [open /tmp/1 w]
+foreach f $netlist {
+        set fd [open $f]
+        #puts "reading file $f"
+        while {[gets $fd line] != -1} {
+                set pattern1 " [constraints get cell 0 $i];"
+                if {[regexp -all -- $pattern1 $line]} {
+                        #puts "pattern1 \"$pattern1\" found and matching in verilog file \"$f\" is \"$line\""
+                        set pattern2 [lindex [split $line ";"] 0]
+                        #puts "creatng pattern2 by splitting pattern1 using semi-colon as delimiter => \"$pattern2\""
+                        if {[regexp -all {input} [lindex [split $pattern2 "\S+"] 0]]} {
+                                #puts "out of all patterns, \"$pattern2\"has matching string \"input\". Sp preserving this line and ignoring others"
+                                set s1 "[lindex [split $pattern2 "\S+"] 0] [lindex [split $pattern2 "\S+"] 1] [lindex [split $pattern2 "\S+"] 2]"
+                                #puts "printing first 3 elements of pattern2 as \"$s1\" using space as delimiter"
+                                puts -nonewline $tmp_file "\n[regsub -all {\s+} $s1 " "]"
+                                #puts "replace mutiple spaces in s1 by single space and reformant as \"[regsub -all {\s+} $s1 " "]\""
+                                }
+                        }
+
+                }
+close $fd
+}
+close $tmp_file
+
+set tmp_file [open /tmp/1 r]
+#puts "reading [read $tmp_file]"
+#puts "reading /tmp/1 file as [split [read $tmp_file] \n]"
+#puts "sorting /tmp/1 contents as [lsort -unique [split [read $tmp_file] \n ]]"
+#puts "joining /tmp/1 as [join [lsort -unique [split [read $tmp_file] \n ]] \n]"
+set tmp2_file [open /tmp/2 w]
+puts -nonewline $tmp2_file "[join [lsort -unique [split [read $tmp_file] \n]] \n]"
+close $tmp_file
+close $tmp2_file
+
+set tmp2_file [open /tmp/2 r]
+#puts "Count is [llength [read $tmp2_file]]"
+set count [llength [read $tmp2_file]]
+#puts "Splitting content of tmp_2 using space and counting number of elements as $count"
+
+if {$count > 2} {
+        set op_ports [concat [constraints get cell 0 $i]*]
+        #puts "bussed"
+} else {
+        set op_ports [constraints get cell 0 $i]
+        #puts "not bussed"
+}
+        #puts "output port name is $op_ports since count is $count\n"
+        puts -nonewline $sdc_file "\nset_output_delay -clock \[get_clocks [constraints get  cell $related_clock $i]\] -min -rise -source_latency_included [constraints get cell $output_early_rise_delay_start $i] \[get_ports $op_ports\]"
+        puts -nonewline $sdc_file "\nset_output_delay -clock \[get_clocks [constraints get  cell $related_clock $i]\] -min -fall -source_latency_included [constraints get cell $output_early_fall_delay_start $i] \[get_ports $op_ports\]"
+        puts -nonewline $sdc_file "\nset_output_delay -clock \[get_clocks [constraints get  cell $related_clock $i]\] -max -rise -source_latency_included [constraints get cell $output_late_rise_delay_start $i] \[get_ports $op_ports\]"
+        puts -nonewline $sdc_file "\nset_output_delay -clock \[get_clocks [constraints get  cell $related_clock $i]\] -max -fall -source_latency_included [constraints get cell $output_late_fall_delay_start $i] \[get_ports $op_ports\]"
+        puts -nonewline $sdc_file "\nset_load [constraints get cell $output_load_start $i] \[get_ports $op_ports\]"
+
+        set i [expr {$i+1}]
+
+}
+
+close $tmp2_file
+#return
+close $sdc_file
+
+puts "\nInfo: SDC created. PLease use constraints in path $OutputDirectory/$DesignName.sdc"``` </pre>
+
+<img width="731" height="543" alt="image" src="https://github.com/user-attachments/assets/cbecdb03-7ddb-4aef-b0b2-7be974971540" />
+
+The /tmp/1 and /tmp/2 files will have similar formats for both input and output ports.
+
+<pre> ```module memory (CLK, ADDR, DIN, DOUT);
+
+parameter wordSize = 1;
+parameter addressSize = 1;
+
+input ADDR, CLK;
+input [wordSize-1:0] DIN;
+output reg [wordSize-1:0] DOUT;
+reg [wordSize:0] mem [0:(1<<addressSize)-1];
+
+always @(posedge CLK) begin
+	mem[ADDR] <= DIN;
+	DOUT <= mem[ADDR];
+	end
+
+endmodule``` </pre>
 
 
+The basic Yosys script memory.ys, used to synthesize the design and generate both the gate-level netlist and a 2D gate-level representation of the memory module, is provided below.
 
+<pre> ```read_liberty -lib -ignore_miss_dir -setattr blackbox /home/kunalg/Desktop/work/openmsp430/openmsp430/osu018_stdcells.lib
+read_verilog memory.v
+synth top memory
+splitnets -ports -format ___
+dfflibmap -liberty /home/kunalg/Desktop/work/openmsp430/openmsp430/osu018_stdcells.lib
+opt
+abc -liberty /home/kunalg/Desktop/work/openmsp430/openmsp430/osu018_stdcells.lib
+flatten
+clean -purge
+opt
+clean
+write_verilog memory_synth.v``` </pre>
 
+The output view of netlist from the code is shown below.
 
+<img width="950" height="537" alt="image" src="https://github.com/user-attachments/assets/04360f42-5597-40ce-af4e-50106472c680" />
 
+memory write process is illustrated in the following images using a truth table
+
+<img width="947" height="691" alt="image" src="https://github.com/user-attachments/assets/eeb89325-e917-460b-9f4c-4e275f82beac" />
+
+first rising edge of the clock
+
+<img width="948" height="536" alt="image" src="https://github.com/user-attachments/assets/91d4a00e-2954-4c0b-a90e-2a915dc1c4b9" />
+
+first rising edge of the clock - write process done
+
+<img width="945" height="526" alt="image" src="https://github.com/user-attachments/assets/c57e7b13-e79d-496a-b0e2-7dcccf7cdb8b" />
+
+memory read process is demonstrated in the following images through a truth table
+
+<img width="952" height="682" alt="image" src="https://github.com/user-attachments/assets/3e6a328d-1f6b-40ce-8999-8a3495ae53d0" />
+
+After first rising edge and before second rising edge of the clock
+
+<img width="940" height="533" alt="image" src="https://github.com/user-attachments/assets/6314eecf-c210-446e-811c-a1a0ee54214d" />
+
+After second rising edge of the clock - read process done
+
+<img width="952" height="523" alt="image" src="https://github.com/user-attachments/assets/28ccae59-d39d-486f-9f83-02f513f457b9" />
+
+The hierarchy check script was successfully implemented. The developed code generates the required script for performing hierarchy verification.
+
+<pre> ```#Hierarchy Check
+puts "\nInfo: Creating hierarchy check script to be used by Yosys"
+set data "read_liberty -lib -ignore_miss_dir -setattr blackbox ${LateLibraryPath}"
+puts "data is \"$data\""
+set filename "$DesignName.hier.ys"
+puts "Filename is \"$filename\""
+set fileId [open $OutputDirectory/$filename "w"]
+puts -nonewline $fileId $dat
+set netlist [glob -dir $NetlistDirectory *.v]
+puts "Netlist is \"$netlist\""
+foreach f $netlist {
+	set data $f
+	puts "Data is \"$f\""	
+	puts -nonewline $fileId "\nread_verilog $f"
+}
+puts -nonewline $fileId "\nhierarchy -check"
+close $fileId``` </pre>
+
+<img width="1035" height="493" alt="image" src="https://github.com/user-attachments/assets/d2cc69c3-5ed4-4257-b354-2ef1a9074762" />
+
+<img width="1041" height="321" alt="image" src="https://github.com/user-attachments/assets/5330c64b-0520-48e4-9e12-3229e855304a" />
+
+Hierarchy Check and Error Handling is done in Yosys. The script detects and respond to any errors that occur during the hierarchy check.
+
+<pre> ```set my_err [catch {exec yosys -s $OutputDirectory/$DesignName.hier.ys >& $OutputDirectory/$DesignName.hierarchy_check.log} msg]
+puts "error flag is $my_err"
+if { $my_err } {
+set filename "$OutputDirectory/$DesignName.hierarchy_check.log"
+	puts "Log file name is $filename"
+	set pattern {referenced in module}
+	puts "Pattern is $pattern"
+	set count 0
+	set fid [open $filename r]
+	while {[gets $fid line] != -1} {
+		incr count [regexp -all -- $pattern $line]
+		if {[regexp -all -- $pattern $line]} {
+			puts "\nError: Module [lindex $line 2] is not part of design $DesignName. Please correct RTL in the path '$NetlistDirectory'"
+			puts "\nInfo: Hierarchy check has FAILED"
+		}
+	}
+	close $fid
+} else {
+	puts "\nInfo: Hierarchy check is PASS"
+}
+puts "\nInfo: PLease find hierarchy check details in [file normalize $OutputDirectory/$DesignName.hierarchy_check.log] for more info"
+cd $working_dir``` </pre>
+
+<img width="1037" height="506" alt="image" src="https://github.com/user-attachments/assets/8c9392a4-bffa-41a0-b1e6-f0c05c8ebf3d" />
+
+<img width="1036" height="505" alt="image" src="https://github.com/user-attachments/assets/ea47d506-2770-406a-b69f-495e468b0092" />
 
 
