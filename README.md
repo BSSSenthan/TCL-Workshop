@@ -501,3 +501,395 @@ cd $working_dir``` </pre>
 <img width="1036" height="505" alt="image" src="https://github.com/user-attachments/assets/ea47d506-2770-406a-b69f-495e468b0092" />
 
 
+
+Module 5: QOR Report Generation
+
+Using Yosys tool I have executed the main synthesis flow in module5, understood the working of the proc. Generating essential files like .conf, .spef, and .timing and complete opentimer script performing a static timing analysis (STA) run and extracting relevant Quality of Results (QoR) data from the .results file. This includes writing and dumping the main Yosys synthesis script (.ys file), creating the necessary OpenTimer input files, executing the STA run, and parsing the results to present QoR data in the expected format. 
+
+
+<pre> ```# Synthesis Script
+puts "\nInfo: Creating main synthesis script to be used by Yosys"
+set data "read_liberty -lib -ignore_miss_dir -setattr blackbox ${LateLibraryPath}"
+set filename "$DesignName.ys"
+set fileId [open $OutputDirectory/$filename "w"]
+puts -nonewline $fileId $data
+
+set netlist [glob -dir $NetlistDirectory *.v]
+foreach f $netlist {
+	set data $f
+	puts -nonewline $fileId "\nread_verilog $f"
+}
+puts -nonewline $fileId "\nhierarchy -top $DesignName"
+puts -nonewline $fileId "\nsynth -top $DesignName"
+puts -nonewline $fileId "\nsplitnets -ports -format ___\ndfflibmap -liberty ${LateLibraryPath}\nopt"
+puts -nonewline $fileId "\nabc -liberty ${LateLibraryPath}"
+puts -nonewline $fileId "\nflatten"
+puts -nonewline $fileId "\nclean -purge\niopadmap -outpad BUFX2 A:Y -bits\nopt\nclean"
+puts -nonewline $fileId "\nwrite_verilog $OutputDirectory/$DesignName.synth.v"
+close $fileId
+puts "\nInfo: Synthesis script created and can be accessed from path $OutputDirectory/$DesignName.ys"
+
+puts "\nInfo: Running synthesis................"``` </pre>
+
+
+<img width="1035" height="481" alt="image" src="https://github.com/user-attachments/assets/ceb3ee58-9787-406d-8a94-b3e8ec5aaf6c" />
+
+<img width="1036" height="426" alt="image" src="https://github.com/user-attachments/assets/0434f4ce-511a-4d50-be18-babbf2d4f214" />
+
+Yosys synthesis script has been successfully implemented, including error handling to terminate the process if any issues are encountered during execution.
+
+
+<pre> ```if {[catch {exec yosys -s $OutputDirectory/$DesignName.ys >& $OutputDirectory/$DesignName.synthesis.log} msg]} {
+	puts "\nError: Synthesis failed due to errors. Please refer to log $OutputDirectory/$DesignName.synthesis.log for errors"
+	exit
+} else {
+	puts "\nInfo: Synthesis finished successfully"
+}
+puts "Please refer to log $OutputDirectory/$DesignName.synthesis.log"``` </pre>
+
+
+<img width="1037" height="190" alt="image" src="https://github.com/user-attachments/assets/a21d8a1f-ad7e-44ea-b482-4faf5a9085f8" />
+
+<img width="1035" height="491" alt="image" src="https://github.com/user-attachments/assets/9fb11160-0c48-4448-917d-6c3a6168bb6a" />
+
+
+Editing the synth.v file where we have "*" and "\"
+
+<pre> ```#Editing synth.v to be usable by Opentimer
+set fileId [open /tmp/1 "w"]
+puts -nonewline $fileId [exec grep -v -w "*" $OutputDirectory/$DesignName.synth.v]
+close $fileId
+
+set output [open $OutputDirectory/$DesignName.final.synth.v "w"]
+
+set filename "/tmp/1"
+set fid [open $filename r]
+	while {[gets $fid line] != -1} {
+		puts -nonewline $output [string map {"\\" ""} $line]
+		puts -nonewline $output "\n"
+	}
+	close $fid
+	close $output
+
+	puts "\nInfo: Please find the synthesized netlist for $DesignName at below path. You can use this netlist for STA or PNR"
+puts "\n$OutputDirectory/$DesignName.final.synth.v"``` </pre>
+
+
+<img width="1038" height="503" alt="image" src="https://github.com/user-attachments/assets/2c035cda-d46e-4e8d-9a16-3ffc25cc9b96" />
+
+<img width="1045" height="513" alt="image" src="https://github.com/user-attachments/assets/74c2b8c7-df46-495f-968b-28afbd4102bd" />
+
+Started using proc methods to define custom commands for enhancing script flexibility and reusability.
+
+<pre> ```#!/bin/tclsh
+proc reopenStdout {file} {
+    close stdout
+    open $file w       
+}``` </pre>
+
+This is the proc for set_multi_cpu_usage
+
+<pre> ```#!/bin/tclsh
+
+proc set_multi_cpu_usage {args} {
+        array set options {-localCpu <num_of_threads> -help "" }
+        while {[llength $args]} {
+                switch -glob -- [lindex $args 0] {
+                	-localCpu {
+				set args [lassign $args - options(-localCpu)]
+				puts "set_num_threads $options(-localCpu)"
+			}
+                	-help {
+				set args [lassign $args - options(-help) ]
+				puts "Usage: set_multi_cpu_usage -localCpu <num_of_threads> -help"
+				puts "\t-localCpu - To limit CPU threads used"
+				puts "\t-help - To print usage"
+                      	}
+                }
+        }
+}``` </pre>
+
+<img width="497" height="466" alt="image" src="https://github.com/user-attachments/assets/0c5e3cc6-e01a-4c69-850e-a62ff7eed201" />
+
+read_lib.proc This proc generates the commands needed to load both early and late timing libraries required by the OpenTimer tool.
+
+<pre> ```#!/bin/tclsh
+
+proc read_lib args {
+	# Setting command parameter options and its values
+	array set options {-late <late_lib_path> -early <early_lib_path> -help ""}
+	while {[llength $args]} {
+		switch -glob -- [lindex $args 0] {
+		-late {
+			set args [lassign $args - options(-late) ]
+			puts "set_late_celllib_fpath $options(-late)"
+		      }
+		-early {
+			set args [lassign $args - options(-early) ]
+			puts "set_early_celllib_fpath $options(-early)"
+		       }
+		-help {
+			set args [lassign $args - options(-help) ]
+			puts "Usage: read_lib -late <late_lib_path> -early <early_lib_path>"
+			puts "-late <provide late library path>"
+			puts "-early <provide early library path>"
+			puts "-help - Provides user deatails on how to use the command"
+		      }	
+		default break
+		}
+	}
+}``` </pre>
+
+This is the proc for read_verilog
+
+<pre> ```#!/bin/tclsh
+
+# Proc to convert read_verilog to OpenTimer format
+proc read_verilog {arg1} {
+	puts "set_verilog_fpath $arg1"
+}``` </pre>
+
+
+read_sdc.proc This proc generates the necessary commands to load the .timing constraints file required by the OpenTimer tool. It performs a conversion of SDC file contents into a .timing file format compatible with OpenTimer.
+
+<pre> ```#!/bin/tclsh
+
+proc read_sdc {arg1} {
+
+# 'file dirname <>' to get directory path only from full path
+set sdc_dirname [file dirname $arg1]
+# 'file tail <>' to get last element
+set sdc_filename [lindex [split [file tail $arg1] .] 0 ]
+set sdc [open $arg1 r]
+set tmp_file [open /tmp/1 w]
+
+# Removing "[" & "]" from SDC for further processing the data with 'lindex'
+# 'read <>' to read entire file
+puts -nonewline $tmp_file [string map {"\[" "" "\]" " "} [read $sdc]]     
+close $tmp_file
+
+# Opening tmp file to write constraints converted from generated SDC
+set timing_file [open /tmp/3 w]
+
+# Converting create_clock constraints
+# -----------------------------------
+set tmp_file [open /tmp/1 r]
+set lines [split [read $tmp_file] "\n"]
+# 'lsearch -all -inline' to search list for pattern and retain elementas with pattern only
+set find_clocks [lsearch -all -inline $lines "create_clock*"]
+foreach elem $find_clocks {
+	set clock_port_name [lindex $elem [expr {[lsearch $elem "get_ports"]+1}]]
+	set clock_period [lindex $elem [expr {[lsearch $elem "-period"]+1}]]
+	set duty_cycle [expr {100 - [expr {[lindex [lindex $elem [expr {[lsearch $elem "-waveform"]+1}]] 1]*100/$clock_period}]}]
+	puts $timing_file "\nclock $clock_port_name $clock_period $duty_cycle"
+}
+close $tmp_file``` </pre>
+
+
+Code and Results for STA
+
+
+<pre> ```puts "\nInfo: Timing Analysis Started....."
+puts "\nInfo: Initializing number of threads, libraries, sdc, verilog netlist path...."
+source /home/vsduser/vsdsynth/procs/reopenStdout.proc
+source /home/vsduser/vsdsynth/procs/set_num_threads.proc
+reopenStdout $OutputDirectory/$DesignName.conf
+set_multi_cpu_usage -localCpu 2
+#return
+
+source /home/vsduser/vsdsynth/procs/read_lib.proc
+read_lib -early /home/vsduser/vsdsynth/osu018_stdcells.lib
+
+read_lib -late /home/vsduser/vsdsynth/osu018_stdcells.lib
+
+source /home/vsduser/vsdsynth/procs/read_verilog.proc
+read_verilog $OutputDirectory/$DesignName.final.synth.v
+
+source /home/vsduser/vsdsynth/procs/read_sdc.proc
+read_sdc $OutputDirectory/$DesignName.sdc
+reopenStdout /dev/tty
+#return
+if {$enable_prelayout_timing == 1} {
+	puts "\nInfo: enable_prelayout_timing is $enable_prelayout_timing. Enabling zero-wire load parasitics"
+	set spef_file [open $OutputDirectory/$DesignName.spef w]
+puts $spef_file "*SPEF \"IEEE 1481-1998\" "
+puts $spef_file "*DESIGN \"$DesignName\" "
+puts $spef_file "*DATE \"Sun May 11 20:51:50 2025\" "
+puts $spef_file "*VENDOR \"PS 2025 Hackathon\" "
+puts $spef_file "*PROGRAM \"Benchmark Parasitic Generator\" "
+puts $spef_file "*VERSION \"0.0\" "
+puts $spef_file "*DESIGN_FLOW \"NETLIST_TYPE_VERILOG\" "
+puts $spef_file "*DIVIDER / "
+puts $spef_file "*DELIMITER : "
+puts $spef_file "*BUS_DELIMITER [ ] "
+puts $spef_file "*T_UNIT 1 PS "
+puts $spef_file "*C_UNIT 1 FF "
+puts $spef_file "*R_UNIT 1 KOHM "
+puts $spef_file "*L_UNIT 1 UH "
+}
+
+close $spef_file
+
+set conf_file [open $OutputDirectory/$DesignName.conf a]
+puts $conf_file "set_spef_fpath $OutputDirectory/$DesignName.spef"
+puts $conf_file "init_timer "
+puts $conf_file "report_timer "
+puts $conf_file "report_wns "
+puts $conf_file "report_worst_paths -numPaths 10000 "
+close $conf_file
+
+set tcl_precision 3
+
+set time_elapsed_in_us [time {exec /home/vsduser/OpenTimer-1.0.5/bin/OpenTimer < $OutputDirectory/$DesignName.conf >& $OutputDirectory/$DesignName.results} 1]
+set time_elapsed_in_sec "[expr {[lindex $time_elapsed_in_us 0]/100000}] sec"
+puts "\nInfo: STA finished in $time_elapsed_in_sec seconds"
+puts "\nInfo: Refer to $OutputDirectory/$DesignName.results for warning and errors"
+
+puts "tcl_precision is $tcl_precision``` </pre>
+
+
+<img width="567" height="1067" alt="image" src="https://github.com/user-attachments/assets/674081d7-b465-422a-b03c-dd3402c0a07c" />
+
+<img width="1021" height="941" alt="image" src="https://github.com/user-attachments/assets/4766f93f-791e-4e8a-a5f6-9be3c140ed60" />
+
+<img width="1007" height="895" alt="image" src="https://github.com/user-attachments/assets/6d86f089-0a47-4fef-8d62-3791b6c6a3b3" />
+
+<img width="1108" height="949" alt="image" src="https://github.com/user-attachments/assets/39e5b19c-0dc2-47dc-a870-cdb5c72b2fab" />
+
+<img width="1054" height="934" alt="image" src="https://github.com/user-attachments/assets/17b946ef-0666-48c3-a3f5-c77881180da7" />
+
+<img width="1067" height="440" alt="image" src="https://github.com/user-attachments/assets/7c5e7e04-502f-49c5-8d94-b61772c3afeb" />
+
+<img width="1058" height="345" alt="image" src="https://github.com/user-attachments/assets/670373ce-3b78-4c3d-b716-6c8eb7d702cf" />
+
+I have successfully developed a script to extract all essential data points from the .results file and other relevant sources for Quality of Results (QoR) analysis. This includes capturing key metrics along with the total runtime of the entire .tcl script. The core implementation is presented below, accompanied by terminal screenshots that display variable outputs and debugging details using puts statements.
+
+<pre> ```#---------------find WNS using RAT-------------------------#
+set worst_RAT_slack "-"
+set report_file [open $OutputDirectory/$DesignName.results r]
+set pattern {RAT}
+puts "pattern is $pattern"
+while {[gets $report_file line] != -1} {
+	if {[regexp $pattern $line]} {
+		set worst_RAT_slack "[expr {[lindex $line 3]/1000}]ns"
+		puts "worst_RAT_slack is $worst_RAT_slack"
+		break
+	} else {
+		continue
+	}
+}
+close $report_file
+#return
+
+#--------------------------fine number of output violation------------#
+set report_file [open $OutputDirectory/$DesignName.results r]
+set count 0
+while {[gets $report_file line] != -1} {
+                incr count [regexp -all -- $pattern $line]
+}
+set Number_of_output_violations $count
+puts "Number of output violations $Number_of_output_violations"
+close $report_file
+
+
+#---------------find WNS setup violation-------------------------#
+set worst_negative_setup_slack "-"
+set report_file [open $OutputDirectory/$DesignName.results r]
+set pattern {Setup}
+puts "pattern is $pattern"
+while {[gets $report_file line] != -1} {
+        if {[regexp $pattern $line]} {
+                set worst_negative_setup_slack "[expr {[lindex $line 3]/1000}]ns"
+                break
+        } else {
+                continue
+        }
+}
+close $report_file
+
+#---------------find number of setup violation-------------------------#
+
+set report_file [open $OutputDirectory/$DesignName.results r]
+set count 0
+while {[gets $report_file line] != -1} {
+                incr count [regexp -all -- $pattern $line]
+}
+set Number_of_setup_violations $count
+close $report_file
+
+#---------------find WNS hold violation-------------------------#
+set worst_negative_hold_slack "-"
+set report_file [open $OutputDirectory/$DesignName.results r]
+set pattern {Hold}
+puts "pattern is $pattern"
+while {[gets $report_file line] != -1} {
+        if {[regexp $pattern $line]} {
+                set worst_negative_hold_slack "[expr {[lindex $line 3]/1000}]ns"
+                break
+        } else {
+                continue
+        }
+}
+close $report_file
+
+#---------------find number of hold violation-------------------------#
+
+set report_file [open $OutputDirectory/$DesignName.results r]
+set count 0
+while {[gets $report_file line] != -1} {
+                incr count [regexp -all -- $pattern $line]
+}
+set Number_of_hold_violations $count
+close $report_file
+
+
+#---------------find number of instance---------------------------#
+set pattern {Num of gates}
+puts "pattern is $pattern"
+set report_file [open $OutputDirectory/$DesignName.results r]
+while {[gets $report_file line] != -1} {
+        if {[regexp $pattern $line]} {
+                set Instance_count [lindex [join $line " "] 4 ]
+                break
+        } else {
+                continue
+        }
+}
+close $report_file
+
+set Instance_count "$Instance_count PS"
+set time_elapsed_in_sec "$time_elapsed_in_sec PS"``` </pre>
+
+<img width="1032" height="501" alt="image" src="https://github.com/user-attachments/assets/ab0853ff-e105-4b97-a82a-c5db4ea7ae47" />
+
+The code for generating the Quality of Results (QoR) report has been successfully implemented.
+
+<pre> ```set formatStr {%15s%15s%15s%15s%15s%15s%15s%15s%15s}
+
+puts [format $formatStr "-----------" "-------" "--------------" "-----------" "-----------" "----------" "----------" "-------" "-------"]
+puts [format $formatStr "Design Name" "Runtime" "Instance Count" " WNS Setup " " FEP Setup " " WNS Hold " " FEP Hold " "WNS RAT" "FEP RAT"]
+puts [format $formatStr "-----------" "-------" "--------------" "-----------" "-----------" "----------" "----------" "-------" "-------"]
+foreach design_name $DesignName runtime $time_elapsed_in_sec instance_count $Instance_count wns_setup $worst_negative_setup_slack fep_setup $Number_of_setup_violations wns_hold $worst_negative_hold_slack fep_hold $Number_of_hold_violations wns_rat $worst_RAT_slack fep_rat $Number_of_output_violations {
+	puts [format $formatStr $design_name $runtime $instance_count $wns_setup $fep_setup $wns_hold $fep_hold $wns_rat $fep_rat]
+}
+
+puts [format $formatStr "-----------" "-------" "--------------" "-----------" "-----------" "----------" "----------" "-------" "-------"]
+puts "\n"``` </pre>
+
+
+<img width="1030" height="461" alt="image" src="https://github.com/user-attachments/assets/2b16ee5f-f8eb-4699-9df1-2f2026687317" />
+
+<img width="636" height="652" alt="image" src="https://github.com/user-attachments/assets/61e9da86-ac11-4822-9d38-4042448ebcba" />
+
+<img width="1037" height="346" alt="image" src="https://github.com/user-attachments/assets/cc0bdf68-b2bb-4971-940d-89b62eab9853" />
+
+<img width="1037" height="482" alt="image" src="https://github.com/user-attachments/assets/40540462-dbcb-488c-9da7-5b1922059768" />
+
+Tools Used
+TCL Development Suite
+Yosys – Open-source RTL synthesis
+OpenTimer – Static timing analysis
+VSD custom libraries
+
+
+
